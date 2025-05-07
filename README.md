@@ -17,7 +17,7 @@ raytracing-scaffold-prediction
 │   ├── CG_ex
 │       ├ ... (same)
 │   ├ ... (Same folders for FG, MF, MG, NF, NF+OS, PPS, SC and SC+OS)
-
+│
 ├── models
 │   └── model_inception_actin_plane_filtered.pth  # Pre-trained model for predictions
 ├── src
