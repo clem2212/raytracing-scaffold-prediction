@@ -7,15 +7,21 @@ This project implements a ray-tracing algorithm to process 3D models in OBJ form
 ```
 raytracing-scaffold-prediction
 ├── data
-│   ├── sample_example_1
-│       ├── example.obj                # Example 3D model in OBJ format
+│   ├── CF_ex
+│       ├── CF_ex.obj                  # Example 3D model in OBJ format
 │       ├── distance_map_1.npy         # First distance map generated
+│       ├── distance_map_1.png         # First distance map image for visualization
 │       ├── distance_map_2.npy         # Second distance map generated
-│       └── predictions.json            # Predictions of scaffold types
+│       ├── distance_map_2.png         # Second distance map image for visualization
+│       └── predictions.json           # Predictions of scaffold types
+│   ├── CG_ex
+│       ├ ... (same)
+│   ├ ... (Same folders for FG, MF, MG, NF, NF+OS, PPS, SC and SC+OS)
+
 ├── models
 │   └── model_inception_actin_plane_filtered.pth  # Pre-trained model for predictions
 ├── src
-│   ├── process_obj.py                  # Script to process OBJ file and generate distance maps
+│   ├── process_obj.py                   # Script to process OBJ file, generate distance maps amd predict
 │   ├── predict_scaffold.py              # Script to load model and predict scaffold types
 │   └── utils
 │       └── __init__.py                 # Utility functions for the project
