@@ -245,26 +245,60 @@ def sample_hemisphere_relative_to_plane(mesh, transform, density, above_plane=Tr
     points = sample_hemisphere(density, transform, radius)
     return points
 
-def distance_mapping(surface, ray_source, ray_targets, n_jobs=8):
-    """Compute distance mapping from ray source to ray targets on surface with GPU acceleration
+def distance_mapping(surface, ray_source, ray_targets, n_jobs=8, single_batch=False):
+    """Compute distance mapping from ray source to ray targets on surface
 
     Args:
         surface (vtkPolyData): mesh
         ray_source (np.array): source point
         ray_targets (np.array): target points
         n_jobs (int): number of parallel jobs (used as fallback)
+        single_batch (bool): if True, process as a single batch (no progress bar)
 
     Returns:
         distances (np.array): distance mapping
     """
-    # Check if CUDA is available
-    
+    # Set up OBB tree for ray casting
     obbTree = vtk.vtkOBBTree()
     obbTree.SetDataSet(surface)
     obbTree.BuildLocator()
     
-    # Create shared progress bar
+    # Get total number of points to process
     total_points = ray_targets.shape[0]
+    
+    # Start timing
+    import time
+    start_time = time.time()
+    
+    # If single_batch=True, process directly without progress bar and threading
+    if single_batch:
+        # Process the entire batch directly
+        distances = np.zeros(total_points).astype(float)
+        intersection_count = 0
+        
+        # Add a mini progress indicator for large batches
+        for i in range(total_points):
+            if i % 1000 == 0 and i > 0:
+                elapsed = time.time() - start_time
+                est_total = (elapsed / i) * total_points
+                remaining = est_total - elapsed
+                print(f"  Progress: {i}/{total_points} points ({i/total_points*100:.1f}%), " +
+                      f"Elapsed: {elapsed:.1f}s, Remaining: {remaining:.1f}s")
+            
+            distance = find_intersect_on_surface(obbTree, ray_source, ray_targets[i])
+            distances[i] = distance
+            if distance > 0:
+                intersection_count += 1
+        
+        # Report batch statistics
+        elapsed_time = time.time() - start_time
+        intersection_rate = intersection_count / total_points if total_points > 0 else 0
+        print(f"Batch completed in {elapsed_time:.2f} seconds")
+        print(f"Intersection rate: {intersection_rate:.2%} ({intersection_count}/{total_points} rays hit surface)")
+        
+        return distances
+    
+    # Otherwise, use parallel processing with progress bar
     pbar = tqdm(total=total_points, desc="Ray casting progress")
 
     # Use parallel processing with progress tracking
@@ -280,16 +314,24 @@ def distance_mapping(surface, ray_source, ray_targets, n_jobs=8):
     
     # Combine results
     distances = np.zeros(ray_targets.shape[0]).astype(float)
+    total_intersections = 0
     for i in range(n_jobs - 1):
         if i * size < len(distances):
             end_idx = min((i + 1) * size, len(distances))
             distances[i * size: end_idx] = outputs_async[i][0][:end_idx-i*size]
+            total_intersections += outputs_async[i][1]
     
     if (n_jobs - 1) * size < len(distances):
         distances[(n_jobs - 1) * size:] = outputs_async[n_jobs - 1][0][:len(distances)-(n_jobs-1)*size]
+        total_intersections += outputs_async[n_jobs - 1][1]
+    
+    # Report overall statistics
+    elapsed_time = time.time() - start_time
+    intersection_rate = total_intersections / total_points if total_points > 0 else 0
+    print(f"Full distance mapping completed in {elapsed_time:.2f} seconds")
+    print(f"Overall intersection rate: {intersection_rate:.2%} ({total_intersections}/{total_points} rays hit surface)")
     
     return distances
-
 
 def find_intersect_parallel(obbTree, ray_source_point, ray_target_points, size, pbar, job):
     """Find intersection points on surface using OBBTree (parallel version) with progress tracking

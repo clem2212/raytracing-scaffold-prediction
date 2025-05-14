@@ -55,13 +55,21 @@ class InceptionScaffoldClassifier(nn.Module):
         return self.inception(x)
 
 
-def process_obj_file(obj_file_path, output_dir, density=1024):
+def process_obj_file(obj_file_path, output_dir, density=512, batch_size=10000):
     """Process the OBJ file to generate distance maps and save them as .npy and .png."""
+    import time
+    overall_start_time = time.time()
+    
     print(f"Processing OBJ file: {obj_file_path}")
     # Load the mesh from the OBJ file
-    surface = create_mesh(obj_file_path)
+    try:
+        surface = create_mesh(obj_file_path)
+    except Exception as e:
+        print(f"Error loading mesh: {e}")
+        raise
 
     # Compute mesh properties
+    print("Computing mesh properties...")
     directionx, directiony, normal, centroid = fit_plane(surface)
     top_point, bottom_point = compute_top_bottom_points(centroid, normal)
 
@@ -85,35 +93,76 @@ def process_obj_file(obj_file_path, output_dir, density=1024):
         transform_down = create_transform(centroid, directionx, directiony, normal, inverse=not inverse_default)
         points_bottom = sample_hemisphere_relative_to_plane(surface, transform_down, density, above_plane=False)
 
-    # Compute distance maps
-    distances_top = distance_mapping(surface, top_point, points_bottom)
-    distances_bottom = distance_mapping(surface, bottom_point, points_top)
+    # Compute distance maps using batching
+    print(f"Computing distance maps with density {density} and batch size {batch_size}...")
+    print(f"Total rays to cast: {density * density}")
+    
+    # Prepare output arrays
+    distances_top = np.zeros(density * density)
+    distances_bottom = np.zeros(density * density)
+    
+    # Process in batches to save memory
+    total_points = density * density
+    batch_start_time = time.time()
+    
+    # Top distance map
+    print("\nProcessing TOP distance map:")
+    for i in range(0, total_points, batch_size):
+        end_idx = min(i + batch_size, total_points)
+        print(f"\nProcessing batch {i//batch_size + 1}/{(total_points-1)//batch_size + 1} ({i}/{total_points})...")
+        
+        # Process batch for top distances
+        batch_points = points_bottom[i:end_idx]
+        batch_start = time.time()
+        distances_top[i:end_idx] = distance_mapping(surface, top_point, batch_points, single_batch=True)
+        print(f"Batch {i//batch_size + 1} completed in {time.time() - batch_start:.2f} seconds")
+    
+    top_map_time = time.time() - batch_start_time
+    print(f"\nTop distance map completed in {top_map_time:.2f} seconds")
+    
+    # Bottom distance map
+    print("\nProcessing BOTTOM distance map:")
+    batch_start_time = time.time()
+    for i in range(0, total_points, batch_size):
+        end_idx = min(i + batch_size, total_points)
+        print(f"\nProcessing batch {i//batch_size + 1}/{(total_points-1)//batch_size + 1} ({i}/{total_points})...")
+        
+        # Process batch for bottom distances
+        batch_points = points_top[i:end_idx]
+        batch_start = time.time()
+        distances_bottom[i:end_idx] = distance_mapping(surface, bottom_point, batch_points, single_batch=True)
+        print(f"Batch {i//batch_size + 1} completed in {time.time() - batch_start:.2f} seconds")
+    
+    bottom_map_time = time.time() - batch_start_time
+    print(f"\nBottom distance map completed in {bottom_map_time:.2f} seconds")
 
     # Save distance maps as .npy
     os.makedirs(output_dir, exist_ok=True)
-    distance_map_1_path = Path(output_dir) / "distance_map_1.npy"
-    distance_map_2_path = Path(output_dir) / "distance_map_2.npy"
+    distance_map_1_path = Path(output_dir) / f"distance_map_1_{density}.npy"
+    distance_map_2_path = Path(output_dir) / f"distance_map_2_{density}.npy"
     np.save(distance_map_1_path, distances_top)
     np.save(distance_map_2_path, distances_bottom)
 
     # Save distance maps as .png heatmaps
-    distance_map_1_png_path = Path(output_dir) / "distance_map_1.png"
-    distance_map_2_png_path = Path(output_dir) / "distance_map_2.png"
+    distance_map_1_png_path = Path(output_dir) / f"distance_map_1_{density}.png"
+    distance_map_2_png_path = Path(output_dir) / f"distance_map_2_{density}.png"
 
     plt.figure()
     plt.imshow(distances_top.reshape((density, density)), cmap="viridis")
     plt.colorbar()
-    plt.title("Distance Map 1 (Top)")
+    plt.title(f"Distance Map 1 (Top) - {density}x{density}")
     plt.savefig(distance_map_1_png_path)
     plt.close()
 
     plt.figure()
     plt.imshow(distances_bottom.reshape((density, density)), cmap="viridis")
     plt.colorbar()
-    plt.title("Distance Map 2 (Bottom)")
+    plt.title(f"Distance Map 2 (Bottom) - {density}x{density}")
     plt.savefig(distance_map_2_png_path)
     plt.close()
 
+    total_time = time.time() - overall_start_time
+    print(f"\nTotal processing time: {total_time:.2f} seconds ({total_time/60:.2f} minutes)")
     print(f"Distance maps saved to '{output_dir}' as .npy and .png.")
 
 def load_model(model_path, num_classes=4):
@@ -183,41 +232,53 @@ def main():
     parser.add_argument("--sample_name", required=True, help="Name of the sample to process.")
     parser.add_argument("--model_path", default="../models/model_inception_actin_plane_filtered.pth", 
                         help="Path to the pre-trained model.")
-    parser.add_argument("--density", type=int, default=1024, help="Density for sampling points.")
+    parser.add_argument("--density", type=int, default=512, help="Density for sampling points.")
+    parser.add_argument("--batch_size", type=int, default=10000, 
+                        help="Batch size for ray casting to reduce memory usage.")
+    parser.add_argument("--force_recompute", action="store_true", 
+                        help="Force recomputation of distance maps even if they exist.")
     args = parser.parse_args()
     
     sample_name = args.sample_name
     model_path = args.model_path
     density = args.density
+    batch_size = args.batch_size
 
-    #STEP 1: Process the OBJ file to create distance maps
+    # STEP 1: Process the OBJ file to create distance maps
     print(f"Processing OBJ file for sample '{sample_name}'...")
     obj_file_path = f"../data/{sample_name}/{sample_name}.obj"
     output_dir = f"../data/{sample_name}/"
     
     # Step 2: Check if distance maps already exist
-    distance_map_1_path = Path(output_dir) / "distance_map_1.npy"
-    distance_map_2_path = Path(output_dir) / "distance_map_2.npy"
+    distance_map_1_path = Path(output_dir) / f"distance_map_1_{density}.npy"
+    distance_map_2_path = Path(output_dir) / f"distance_map_2_{density}.npy"
 
-    if not distance_map_1_path.exists() or not distance_map_2_path.exists():
-        print("Distance maps not found. Computing distance maps...")
-        process_obj_file(obj_file_path, output_dir, density)
+    if args.force_recompute or not distance_map_1_path.exists() or not distance_map_2_path.exists():
+        print("Distance maps not found or recomputation forced. Computing distance maps...")
+        try:
+            process_obj_file(obj_file_path, output_dir, density, batch_size)
+        except Exception as e:
+            print(f"Error processing OBJ file: {e}")
+            return
     else:
         print("Distance maps already exist. Skipping computation.")
 
-    #STEP 3: Load the model and distance maps
-    model = load_model(model_path)
+    # STEP 3: Load the model and distance maps
+    try:
+        model = load_model(model_path)
 
-    # Load the generated distance maps
-    distance_map_1 = np.load(distance_map_1_path)
-    distance_map_2 = np.load(distance_map_2_path)
+        # Load the generated distance maps
+        distance_map_1 = np.load(distance_map_1_path)
+        distance_map_2 = np.load(distance_map_2_path)
 
-    # Step 4: Predict the scaffold type
-    predicted_class = predict_scaffold_type(model, distance_map_1, distance_map_2)
+        # Step 4: Predict the scaffold type
+        predicted_class = predict_scaffold_type(model, distance_map_1, distance_map_2)
 
-    # Step 5: Save the predictions
-    predictions_path = Path(output_dir) / "predictions.json"
-    save_predictions(predicted_class, predictions_path)
+        # Step 5: Save the predictions
+        predictions_path = Path(output_dir) / "predictions.json"
+        save_predictions(predicted_class, predictions_path)
+    except Exception as e:
+        print(f"Error during prediction: {e}")
 
 if __name__ == "__main__":
     main()
