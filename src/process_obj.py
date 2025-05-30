@@ -232,7 +232,7 @@ def main():
     parser.add_argument("--sample_name", required=True, help="Name of the sample to process.")
     parser.add_argument("--model_path", default="../models/model_inception_actin_plane_filtered.pth", 
                         help="Path to the pre-trained model.")
-    parser.add_argument("--density", type=int, default=512, help="Density for sampling points.")
+    parser.add_argument("--density", type=int, default=1024, help="Density for sampling points.")
     parser.add_argument("--batch_size", type=int, default=10000, 
                         help="Batch size for ray casting to reduce memory usage.")
     parser.add_argument("--force_recompute", action="store_true", 
