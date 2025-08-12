@@ -282,8 +282,8 @@ def distance_mapping(surface, ray_source, ray_targets, n_jobs=8, single_batch=Fa
                 elapsed = time.time() - start_time
                 est_total = (elapsed / i) * total_points
                 remaining = est_total - elapsed
-                print(f"  Progress: {i}/{total_points} points ({i/total_points*100:.1f}%), " +
-                      f"Elapsed: {elapsed:.1f}s, Remaining: {remaining:.1f}s")
+                #print(f"  Progress: {i}/{total_points} points ({i/total_points*100:.1f}%), " +
+                #     f"Elapsed: {elapsed:.1f}s, Remaining: {remaining:.1f}s")
             
             distance = find_intersect_on_surface(obbTree, ray_source, ray_targets[i])
             distances[i] = distance

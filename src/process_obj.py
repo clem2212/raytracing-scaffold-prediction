@@ -230,7 +230,8 @@ def save_predictions(predictions, output_path):
 def main():
     parser = argparse.ArgumentParser(description="Process OBJ file and predict scaffold type.")
     parser.add_argument("--sample_name", required=True, help="Name of the sample to process.")
-    parser.add_argument("--model_path", default="../models/model_inception_actin_plane_filtered.pth", 
+    parser.add_argument("--data_folder", default="data", help="Path to the folder containing sample data.")
+    parser.add_argument("--model_path", default="models/model_inception_actin_plane_filtered.pth", 
                         help="Path to the pre-trained model.")
     parser.add_argument("--density", type=int, default=1024, help="Density for sampling points.")
     parser.add_argument("--batch_size", type=int, default=10000, 
@@ -240,14 +241,15 @@ def main():
     args = parser.parse_args()
     
     sample_name = args.sample_name
+    data_folder = args.data_folder
     model_path = args.model_path
     density = args.density
     batch_size = args.batch_size
 
     # STEP 1: Process the OBJ file to create distance maps
     print(f"Processing OBJ file for sample '{sample_name}'...")
-    obj_file_path = f"../data/{sample_name}/{sample_name}.obj"
-    output_dir = f"../data/{sample_name}/"
+    obj_file_path = f"{Path(data_folder)}/{sample_name}/{sample_name}.obj"
+    output_dir = f"{Path(data_folder)}/{sample_name}/"
     
     # Step 2: Check if distance maps already exist
     distance_map_1_path = Path(output_dir) / f"distance_map_1_{density}.npy"

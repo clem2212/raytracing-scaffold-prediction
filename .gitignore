@@ -1,3 +1,4 @@
-data/cell3
-data/cell5
-data/cell6
+data_example/cell3
+data_example/cell5
+data_example/cell6
+data/*

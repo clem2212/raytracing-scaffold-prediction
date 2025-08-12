@@ -17,7 +17,7 @@ raytracing-scaffold-prediction
 │   ├── CG_ex
 │       ├ ... (same)
 │   ├ ... (Same folders for FG, MF, MG, NF, NF+OS, PPS, SC and SC+OS)
-
+│
 ├── models
 │   └── model_inception_actin_plane_filtered.pth  # Pre-trained model for predictions
 ├── src
@@ -39,11 +39,11 @@ pip install -r requirements.txt
 
 ## Usage
 
-1. Place your OBJ file in the `data/input` directory. The example OBJ file is provided as `example.obj`.
-2. Run the ray-tracing algorithm to generate distance maps:
+1. Place your OBJ file in the `data/sample_name` directory. The example OBJ file is provided as `sample_name.obj`, with sample_name to 'CF_ex', CG_ex', ...
+2. Go to the src/ folder and run the ray-tracing algorithm to generate distance maps:
 
 ```bash
-python src/process_obj.py
+python src/process_obj.py --samples_name 'sample_name' data_folder 'data'
 ```
 
 3. After generating the distance maps, use the pre-trained model to predict the scaffold type:
