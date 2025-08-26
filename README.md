@@ -6,7 +6,7 @@ This project implements a ray-tracing algorithm to process 3D models in OBJ form
 
 ```
 raytracing-scaffold-prediction
-├── data
+├── data_example
 │   ├── CF_ex
 │       ├── CF_ex.obj                  # Example 3D model in OBJ format
 │       ├── distance_map_1.npy         # First distance map generated
@@ -39,7 +39,7 @@ pip install -r requirements.txt
 
 ## Usage
 
-1. Place your OBJ file in the `data/sample_name` directory. The example OBJ file is provided as `sample_name.obj`, with sample_name to 'CF_ex', CG_ex', ...
+1. Place your OBJ file in the `data/sample_name` directory. The example OBJ file is provided as `sample_name.obj`, with sample_name to 'CF_ex', CG_ex', ... but it can have any name. You just need to have only one .obj file in this folder.
 2. Go to the src/ folder and run the ray-tracing algorithm to generate distance maps:
 
 ```bash
@@ -58,7 +58,3 @@ python src/predict_scaffold.py
 
 - Ensure that the model file `model_inception_actin_plane_filtered.pth` is present in the `models` directory.
 - The output distance maps will be saved in the `data/output` directory.
-
-## License
-
-This project is licensed under the MIT License.
